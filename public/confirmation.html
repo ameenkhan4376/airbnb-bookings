@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Confirmed</title></head>
+<body>
+  <h1>Booking Confirmed!</h1>
+  <div id="details"></div>
+  <a href="index.html">Back to Search</a>
+
+  <script>
+    (async () => {
+      const id = new URLSearchParams(location.search).get('booking_id');
+      const res = await fetch('/api/bookings/' + id);
+      const bk = await res.json();
+      document.getElementById('details').innerHTML = `
+        <p>Listing: ${bk.listing_id}</p>
+        <p>Guest: ${bk.guest_name}</p>
+        <p>From: ${new Date(bk.start_date).toDateString()}</p>
+        <p>To:   ${new Date(bk.end_date).toDateString()}</p>
+        <p>Contact: ${bk.contact}</p>
+      `;
+    })();
+  </script>
+</body>
+</html>

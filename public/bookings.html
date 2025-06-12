@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Book Listing</title>
+</head>
+<body>
+  <h1>Book Your Stay</h1>
+  <form id="bookingForm">
+    <!-- we’ll inject this via JS -->
+    <input type="hidden" name="listing_id" id="listingId" />
+    <p id="listingInfo"></p>
+    <input name="guest_name"    placeholder="Your Name"        required />
+    <input name="arrival" type="date"       required />
+    <input name="departure" type="date"     required />
+    <input name="contact" type="email"      placeholder="Email" required />
+    <button type="submit">Confirm Booking</button>
+  </form>
+
+  <script>
+    // 1) extract listing_id from URL
+    const params = new URLSearchParams(location.search);
+    const listingId = params.get('listing_id');
+    document.getElementById('listingId').value = listingId;
+
+    // 2) fetch listing name to show on the page
+    fetch('/api/listings?'+ new URLSearchParams({ market: '', property_type:'', bedrooms:'' }))
+      // trick: our API only gets name & price, 
+      // but since we're passing no filters it returns 10 random, 
+      // so instead let’s make a dedicated endpoint:
+    ;
+
+    // Better: create an endpoint GET /api/listing/:id
+  </script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AirBnB Listings</title>
+</head>
+<body>
+  <h1>Search Listings</h1>
+  <form id="filterForm">
+    <input name="market"        placeholder="Market (e.g. Paris)" />
+    <input name="property_type" placeholder="Property Type"     />
+    <input name="bedrooms"      type="number" placeholder="Bedrooms" />
+    <button type="submit">Search</button>
+  </form>
+
+  <ul id="results"></ul>
+
+  <script>
+    async function loadListings(e) {
+      if (e) e.preventDefault();
+      const params = new URLSearchParams(new FormData(document.getElementById('filterForm')));
+      const res = await fetch('/api/listings?' + params);
+      const listings = await res.json();
+      const ul = document.getElementById('results');
+      ul.innerHTML = '';
+      if (listings.length === 0) {
+        ul.innerHTML = '<li>No results found.</li>';
+        return;
+      }
+      listings.forEach(l => {
+        const li = document.createElement('li');
+        li.innerHTML = `<a href="bookings.html?listing_id=${l._id}">${l.name} — $${l.price}</a>`;
+        ul.appendChild(li);
+      });
+    }
+
+    document.getElementById('filterForm').addEventListener('submit', loadListings);
+    // load a random sample on page-load
+    window.addEventListener('DOMContentLoaded', loadListings);
+  </script>
+  <form id="filterForm">
+  <select name="market" id="marketSelect">
+    <option value="">Any market</option>
+  </select>
+  <!-- property_type & bedrooms as before -->
+  <button type="submit">Search</button>
+</form>
+
+<script>
+  // on page-load, fetch distinct markets and fill the dropdown:
+  window.addEventListener('DOMContentLoaded', async () => {
+    const res = await fetch('/api/markets');
+    const markets = await res.json();   // e.g. ["Barcelona","Hong Kong",…]
+    const sel = document.getElementById('marketSelect');
+    markets.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m;
+      sel.appendChild(opt);
+    });
+    loadListings();  // still load random sample
+  });
+</script>
+
+</body>
+</html>
