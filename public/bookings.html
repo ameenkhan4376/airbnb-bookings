@@ -1,36 +1,90 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Book Listing</title>
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
 </head>
-<body>
-  <h1>Book Your Stay</h1>
-  <form id="bookingForm">
-    <!-- we’ll inject this via JS -->
-    <input type="hidden" name="listing_id" id="listingId" />
-    <p id="listingInfo"></p>
-    <input name="guest_name"    placeholder="Your Name"        required />
-    <input name="arrival" type="date"       required />
-    <input name="departure" type="date"     required />
-    <input name="contact" type="email"      placeholder="Email" required />
-    <button type="submit">Confirm Booking</button>
-  </form>
+<body class="p-4">
+  <div class="container">
+    <h1 class="mb-4">Book Your Stay</h1>
+
+    <!-- Listing info -->
+    <div id="listingInfo" class="mb-4"></div>
+
+    <!-- Booking form -->
+    <form id="bookingForm" class="row g-2">
+      <input type="hidden" name="listing_id" id="listingId" />
+
+      <div class="col-12">
+        <label for="guest_name" class="form-label">Your Name</label>
+        <input type="text" class="form-control" id="guest_name" name="guest_name" required />
+      </div>
+
+      <div class="col-md-6">
+        <label for="arrival" class="form-label">Arrival Date</label>
+        <input type="date" class="form-control" id="arrival" name="arrival" required />
+      </div>
+
+      <div class="col-md-6">
+        <label for="departure" class="form-label">Departure Date</label>
+        <input type="date" class="form-control" id="departure" name="departure" required />
+      </div>
+
+      <div class="col-12">
+        <label for="contact" class="form-label">Contact Email</label>
+        <input type="email" class="form-control" id="contact" name="contact" required />
+      </div>
+
+      <div class="col-12">
+        <button type="submit" class="btn btn-success">Confirm Booking</button>
+      </div>
+    </form>
+  </div>
 
   <script>
-    // 1) extract listing_id from URL
-    const params = new URLSearchParams(location.search);
+    // 1) Grab listing_id from query string
+    const params = new URLSearchParams(window.location.search);
     const listingId = params.get('listing_id');
     document.getElementById('listingId').value = listingId;
 
-    // 2) fetch listing name to show on the page
-    fetch('/api/listings?'+ new URLSearchParams({ market: '', property_type:'', bedrooms:'' }))
-      // trick: our API only gets name & price, 
-      // but since we're passing no filters it returns 10 random, 
-      // so instead let’s make a dedicated endpoint:
-    ;
+    // 2) Fetch listing details and render
+    async function loadListing() {
+      const res = await fetch('/api/listing/' + listingId);
+      if (!res.ok) {
+        document.getElementById('listingInfo').textContent = 'Listing not found.';
+        return;
+      }
+      const { name, price } = await res.json();
+      document.getElementById('listingInfo').innerHTML = `
+        <h2 class="h4">${name}</h2>
+        <p><strong>Price per night:</strong> $${price}</p>
+      `;
+    }
 
-    // Better: create an endpoint GET /api/listing/:id
+    // 3) On form submit, post booking
+    document.getElementById('bookingForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const form = e.target;
+      const data = new URLSearchParams(new FormData(form));
+      const post = await fetch('/api/bookings', {
+        method: 'POST',
+        body: data
+      });
+      if (!post.ok) {
+        return alert('Booking failed: ' + await post.text());
+      }
+      // Redirect to confirmation page
+      // The server sends us a 302 to /confirmation.html?booking_id=...
+      window.location = post.url;
+    });
+
+    // Initialize
+    loadListing();
   </script>
 </body>
 </html>
