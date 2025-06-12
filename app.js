@@ -1,44 +1,85 @@
 require('dotenv').config();
+
 const express = require('express');
+const helmet = require('helmet');
+const morgan = require('morgan');
 const { MongoClient, ObjectId } = require('mongodb');
+const { body, validationResult } = require('express-validator');
 
 const app = express();
+
+// Security & Logging
+app.use(
+  helmet({
+    contentSecurityPolicy: false
+  })
+);
+
+app.use(morgan('dev'));
+
+// Static files & body parsing
 app.use(express.static('public'));
-app.use(express.urlencoded({ extended: true })); // for parsing form data
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 
-// MongoDB connection setup
+// MongoDB connection
 const client = new MongoClient(process.env.DB_URI);
-let listingsCol, bookingsCol;
+let listingsCol;
+let bookingsCol;
 
-async function start() {
-  await client.connect();
-  const db = client.db('sample_airbnb');
-  listingsCol = db.collection('listingsAndReviews');
-  bookingsCol = db.collection('bookings');
-  console.log('✅ Connected to MongoDB');
+async function startServer() {
+  try {
+    await client.connect();
+    const db = client.db('sample_airbnb');
+    listingsCol = db.collection('listingsAndReviews');
+    bookingsCol = db.collection('bookings');
+    console.log('✅ Connected to MongoDB');
 
-  const port = process.env.PORT || 3000;
-  app.listen(port, () => console.log(`🚀 Server listening on http://localhost:${port}`));
+    // Create indexes for performance
+    await listingsCol.createIndex({ 'address.market': 1 });
+    await listingsCol.createIndex({ property_type: 1 });
+    await listingsCol.createIndex({ bedrooms: 1 });
+    await bookingsCol.createIndex({ listing_id: 1, start_date: 1, end_date: 1 });
+
+    const port = process.env.PORT || 3000;
+    app.listen(port, () => console.log(`🚀 Server listening on http://localhost:${port}`));
+  } catch (err) {
+    console.error('🔴 Failed to start server:', err);
+    process.exit(1);
+  }
 }
 
-start().catch(err => {
-  console.error('🔴 Failed to start server:', err);
-  process.exit(1);
-});
+startServer();
 
-// GET distinct markets for dropdown
+// --- Routes ---
+
+// Distinct markets for dropdown
 app.get('/api/markets', async (req, res) => {
+  console.log('🔍 GET /api/markets called');
   try {
     const markets = await listingsCol.distinct('address.market');
-    res.json(markets.filter(m => m)); // remove empty strings
+    res.json(markets.filter(m => m));
   } catch (err) {
-    console.error(err);
+    console.error('Error in /api/markets:', err);
     res.status(500).send('Error fetching markets');
   }
 });
 
-// GET listings (random sample if no filters, else apply filters)
+// Distinct property types
+app.get('/api/propertyTypes', async (req, res) => {
+  console.log('🔍 GET /api/markets called');
+  try {
+    const types = await listingsCol.distinct('property_type');
+    res.json(types.filter(t => t));
+  } catch (err) {
+    console.error('Error in /api/propertyTypes:', err);
+    res.status(500).send('Error fetching property types');
+  }
+});
+
+// Fetch listings (random sample or filtered)
 app.get('/api/listings', async (req, res) => {
+  console.log('🔍 GET /api/markets called');
   try {
     const { market, property_type, bedrooms } = req.query;
     const pipeline = [];
@@ -52,64 +93,89 @@ app.get('/api/listings', async (req, res) => {
       if (bedrooms)      match.bedrooms          = +bedrooms;
       pipeline.push({ $match: match });
     }
-
-    pipeline.push({
-      $project: {
-        name: 1,
-        price: { $toDouble: '$price' }
-      }
-    });
+    pipeline.push({ $project: { name:1, price: { $toDouble: '$price' } } });
 
     const results = await listingsCol.aggregate(pipeline).toArray();
     res.json(results);
   } catch (err) {
-    console.error(err);
+    console.error('Error in /api/listings:', err);
     res.status(500).send('Error fetching listings');
   }
 });
 
-// GET a single listing by ID
+// Fetch a single listing by ID
 app.get('/api/listing/:id', async (req, res) => {
+  console.log('🔍 GET /api/markets called');
   try {
     const doc = await listingsCol.findOne(
       { _id: new ObjectId(req.params.id) },
-      { projection: { name: 1, price: { $toDouble: '$price' } } }
+      { projection: { name:1, price: { $toDouble:'$price' } } }
     );
     if (!doc) return res.status(404).send('Listing not found');
     res.json(doc);
   } catch (err) {
-    console.error(err);
+    console.error('Error in /api/listing/:id:', err);
     res.status(500).send('Error fetching listing');
   }
 });
 
-// POST create a new booking
-app.post('/api/bookings', async (req, res) => {
-  try {
-    const { listing_id, guest_name, arrival, departure, contact } = req.body;
-    const booking = {
-      listing_id: new ObjectId(listing_id),
-      guest_name,
-      start_date: new Date(arrival),
-      end_date:   new Date(departure),
-      contact
-    };
-    const result = await bookingsCol.insertOne(booking);
-    res.redirect(`/confirmation.html?booking_id=${result.insertedId}`);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send('Error creating booking');
-  }
-});
+// Create new booking with validation and overlap check in transaction
+app.post(
+  '/api/bookings',
+  [
+    body('listing_id').isMongoId(),
+    body('guest_name').trim().notEmpty(),
+    body('arrival').isISO8601(),
+    body('departure').isISO8601(),
+    body('contact').isEmail()
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
 
-// GET a single booking by ID
+    const { listing_id, guest_name, arrival, departure, contact } = req.body;
+    const session = client.startSession();
+    try {
+      let bookingResult;
+      await session.withTransaction(async () => {
+        // Check date overlap
+        const conflict = await bookingsCol.findOne(
+          {
+            listing_id: new ObjectId(listing_id),
+            $or: [
+              { start_date: { $lt: new Date(departure) }, end_date: { $gt: new Date(arrival) } }
+            ]
+          },
+          { session }
+        );
+        if (conflict) throw new Error('Dates overlap existing booking');
+        // Insert
+        bookingResult = await bookingsCol.insertOne(
+          { listing_id: new ObjectId(listing_id), guest_name, start_date: new Date(arrival), end_date: new Date(departure), contact },
+          { session }
+        );
+      });
+      res.redirect(`/confirmation.html?booking_id=${bookingResult.insertedId}`);
+    } catch (err) {
+      console.error('Error in /api/bookings:', err);
+      res.status(400).send(err.message);
+    } finally {
+      await session.endSession();
+    }
+  }
+);
+
+// Fetch a single booking by ID
 app.get('/api/bookings/:id', async (req, res) => {
+  console.log('🔍 GET /api/markets called');
   try {
     const bk = await bookingsCol.findOne({ _id: new ObjectId(req.params.id) });
     if (!bk) return res.status(404).send('Booking not found');
     res.json(bk);
   } catch (err) {
-    console.error(err);
+    console.error('Error in /api/bookings/:id:', err);
     res.status(500).send('Error fetching booking');
   }
 });
