@@ -10,11 +10,8 @@ const app = express();
 
 // Security & Logging
 app.use(
-  helmet({
-    contentSecurityPolicy: false
-  })
+  helmet({ contentSecurityPolicy: false })
 );
-
 app.use(morgan('dev'));
 
 // Static files & body parsing
@@ -22,7 +19,7 @@ app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// MongoDB connection
+// MongoDB setup
 const client = new MongoClient(process.env.DB_URI);
 let listingsCol;
 let bookingsCol;
@@ -35,7 +32,7 @@ async function startServer() {
     bookingsCol = db.collection('bookings');
     console.log('✅ Connected to MongoDB');
 
-    // Create indexes for performance
+    // Indexes for performance
     await listingsCol.createIndex({ 'address.market': 1 });
     await listingsCol.createIndex({ property_type: 1 });
     await listingsCol.createIndex({ bedrooms: 1 });
@@ -53,33 +50,30 @@ startServer();
 
 // --- Routes ---
 
-// Distinct markets for dropdown
+// GET distinct markets
 app.get('/api/markets', async (req, res) => {
-  console.log('🔍 GET /api/markets called');
   try {
     const markets = await listingsCol.distinct('address.market');
     res.json(markets.filter(m => m));
   } catch (err) {
-    console.error('Error in /api/markets:', err);
+    console.error('Error in GET /api/markets:', err);
     res.status(500).send('Error fetching markets');
   }
 });
 
-// Distinct property types
+// GET distinct property types
 app.get('/api/propertyTypes', async (req, res) => {
-  console.log('🔍 GET /api/markets called');
   try {
     const types = await listingsCol.distinct('property_type');
     res.json(types.filter(t => t));
   } catch (err) {
-    console.error('Error in /api/propertyTypes:', err);
+    console.error('Error in GET /api/propertyTypes:', err);
     res.status(500).send('Error fetching property types');
   }
 });
 
-// Fetch listings (random sample or filtered)
+// GET listings (random sample or filtered)
 app.get('/api/listings', async (req, res) => {
-  console.log('🔍 GET /api/markets called');
   try {
     const { market, property_type, bedrooms } = req.query;
     const pipeline = [];
@@ -93,37 +87,45 @@ app.get('/api/listings', async (req, res) => {
       if (bedrooms)      match.bedrooms          = +bedrooms;
       pipeline.push({ $match: match });
     }
-    pipeline.push({ $project: { name:1, price: { $toDouble: '$price' } } });
+
+    // Include _id for link generation and convert price
+    pipeline.push({
+      $project: {
+        _id: 1,
+        name: 1,
+        price: { $toDouble: '$price' }
+      }
+    });
 
     const results = await listingsCol.aggregate(pipeline).toArray();
     res.json(results);
   } catch (err) {
-    console.error('Error in /api/listings:', err);
+    console.error('Error in GET /api/listings:', err);
     res.status(500).send('Error fetching listings');
   }
 });
 
-// Fetch a single listing by ID
+// GET single listing by string ID
 app.get('/api/listing/:id', async (req, res) => {
-  console.log('🔍 GET /api/markets called');
+  const id = req.params.id;
   try {
     const doc = await listingsCol.findOne(
-      { _id: new ObjectId(req.params.id) },
-      { projection: { name:1, price: { $toDouble:'$price' } } }
+      { _id: id },
+      { projection: { name: 1, price: { $toDouble: '$price' } } }
     );
     if (!doc) return res.status(404).send('Listing not found');
     res.json(doc);
   } catch (err) {
-    console.error('Error in /api/listing/:id:', err);
+    console.error('Error in GET /api/listing/:id:', err);
     res.status(500).send('Error fetching listing');
   }
 });
 
-// Create new booking with validation and overlap check in transaction
+// POST new booking (listing_id as string)
 app.post(
   '/api/bookings',
   [
-    body('listing_id').isMongoId(),
+    body('listing_id').notEmpty(),
     body('guest_name').trim().notEmpty(),
     body('arrival').isISO8601(),
     body('departure').isISO8601(),
@@ -137,29 +139,41 @@ app.post(
 
     const { listing_id, guest_name, arrival, departure, contact } = req.body;
     const session = client.startSession();
+
     try {
       let bookingResult;
       await session.withTransaction(async () => {
-        // Check date overlap
+        // Overlap check
         const conflict = await bookingsCol.findOne(
           {
-            listing_id: new ObjectId(listing_id),
+            listing_id: listing_id,
             $or: [
-              { start_date: { $lt: new Date(departure) }, end_date: { $gt: new Date(arrival) } }
+              {
+                start_date: { $lt: new Date(departure) },
+                end_date:   { $gt: new Date(arrival) }
+              }
             ]
           },
           { session }
         );
-        if (conflict) throw new Error('Dates overlap existing booking');
-        // Insert
+        if (conflict) throw new Error('Selected dates overlap an existing booking');
+
+        // Insert booking
         bookingResult = await bookingsCol.insertOne(
-          { listing_id: new ObjectId(listing_id), guest_name, start_date: new Date(arrival), end_date: new Date(departure), contact },
+          {
+            listing_id,
+            guest_name,
+            start_date: new Date(arrival),
+            end_date:   new Date(departure),
+            contact
+          },
           { session }
         );
       });
+
       res.redirect(`/confirmation.html?booking_id=${bookingResult.insertedId}`);
     } catch (err) {
-      console.error('Error in /api/bookings:', err);
+      console.error('Error in POST /api/bookings:', err);
       res.status(400).send(err.message);
     } finally {
       await session.endSession();
@@ -167,15 +181,14 @@ app.post(
   }
 );
 
-// Fetch a single booking by ID
+// GET single booking by ObjectId
 app.get('/api/bookings/:id', async (req, res) => {
-  console.log('🔍 GET /api/markets called');
   try {
     const bk = await bookingsCol.findOne({ _id: new ObjectId(req.params.id) });
     if (!bk) return res.status(404).send('Booking not found');
     res.json(bk);
   } catch (err) {
-    console.error('Error in /api/bookings/:id:', err);
+    console.error('Error in GET /api/bookings/:id:', err);
     res.status(500).send('Error fetching booking');
   }
 });

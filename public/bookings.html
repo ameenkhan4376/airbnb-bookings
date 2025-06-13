@@ -47,12 +47,23 @@
   </div>
 
   <script>
-    // 1) Grab listing_id from query string
-    const params = new URLSearchParams(window.location.search);
-    const listingId = params.get('listing_id');
+  // 1) Grab listing_id
+  const params = new URLSearchParams(window.location.search);
+  const listingId = params.get('listing_id');
+
+  // If no listing_id, show a message and disable the form
+  if (!listingId) {
+    document.body.innerHTML = `
+      <div class="container p-4">
+        <div class="alert alert-warning">
+          No listing selected. <a href="index.html">Go back to search</a>.
+        </div>
+      </div>`;
+  } else {
+    // 2) Populate the hidden input
     document.getElementById('listingId').value = listingId;
 
-    // 2) Fetch listing details and render
+    // 3) Fetch and render the listing info
     async function loadListing() {
       const res = await fetch('/api/listing/' + listingId);
       if (!res.ok) {
@@ -66,11 +77,10 @@
       `;
     }
 
-    // 3) On form submit, post booking
+    // 4) Handle booking form submit
     document.getElementById('bookingForm').addEventListener('submit', async e => {
       e.preventDefault();
-      const form = e.target;
-      const data = new URLSearchParams(new FormData(form));
+      const data = new URLSearchParams(new FormData(e.target));
       const post = await fetch('/api/bookings', {
         method: 'POST',
         body: data
@@ -78,13 +88,13 @@
       if (!post.ok) {
         return alert('Booking failed: ' + await post.text());
       }
-      // Redirect to confirmation page
-      // The server sends us a 302 to /confirmation.html?booking_id=...
+      // Redirect to confirmation
       window.location = post.url;
     });
 
-    // Initialize
     loadListing();
-  </script>
+  }
+</script>
+
 </body>
 </html>
