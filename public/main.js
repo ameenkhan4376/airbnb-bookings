@@ -1,9 +1,8 @@
-// main.js (client-side script)
-
+// public/main.js
 // DEBUG – confirm this script loads in the browser
 console.log('🐛 main.js loaded');
 
-// Fetch an array of strings from the API and populate a <select> element
+// Fetch values and populate <select>
 async function fetchAndFill(path, selectEl) {
   try {
     const res = await fetch(path);
@@ -12,11 +11,10 @@ async function fetchAndFill(path, selectEl) {
     const items = await res.json();
     console.log(path, items);
 
-    // Preserve the default option and clear the rest
+    // Preserve the default option and clear others
     const defaultOpt = selectEl.querySelector('option').outerHTML;
     selectEl.innerHTML = defaultOpt;
 
-    // Populate fetched items
     items.forEach(item => {
       const opt = document.createElement('option');
       opt.value = opt.textContent = item;
@@ -27,12 +25,11 @@ async function fetchAndFill(path, selectEl) {
   }
 }
 
-// Fetch and render listings, based on form filters or random sample
+// Load and render listings
 async function loadListings(e) {
   if (e) e.preventDefault();
   const form = document.getElementById('filterForm');
   const params = new URLSearchParams(new FormData(form));
-
   const res = await fetch('/api/listings?' + params);
   const listings = await res.json();
 
@@ -54,19 +51,17 @@ async function loadListings(e) {
   });
 }
 
-// Initialize on DOMContentLoaded
+// On DOM load, populate dropdowns and initial fetch
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('🐛 DOMContentLoaded in main.js');
   const marketSelect = document.getElementById('marketSelect');
-  console.log('🐛 marketSelect exists?', !!marketSelect);
-  const typeSelect = document.getElementById('typeSelect');
-  const form = document.getElementById('filterForm');
+  const typeSelect   = document.getElementById('typeSelect');
+  const form         = document.getElementById('filterForm');
 
-  // Populate dropdowns
-  await fetchAndFill('/api/markets', marketSelect);
-  await fetchAndFill('/api/propertyTypes', typeSelect);
+  // Updated endpoints for markets & propertyTypes
+  await fetchAndFill('/api/listings/markets', marketSelect);
+  await fetchAndFill('/api/listings/propertyTypes', typeSelect);
 
-  // Hook up form and initial load
   form.addEventListener('submit', loadListings);
   loadListings();
 });
