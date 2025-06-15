@@ -18,7 +18,10 @@
     "express-validator": "^7.2.1",
     "helmet": "^8.1.0",
     "mongodb": "^6.17.0",
-    "morgan": "^1.10.0"
+    "morgan": "^1.10.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.6.2"
   },
   "devDependencies": {
     "eslint": "^9.29.0",
