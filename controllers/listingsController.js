@@ -45,13 +45,20 @@ async function getListings(req, res) {
   }
 }
 
+// controllers/listingsController.js
 async function getListingById(req, res) {
   try {
     const { listingsCol } = req.app.locals.db;
     const id = req.params.id;
+
     const doc = await listingsCol.findOne(
       { _id: id },
-      { projection: { name:1, price:{ $toDouble:'$price' } } }
+      { projection: {
+          name:        1,
+          price:       { $toDouble: '$price' },
+          description: 1       // <–– pull in the description text
+        }
+      }
     );
     if (!doc) return res.status(404).send('Listing not found');
     res.json(doc);
@@ -60,6 +67,7 @@ async function getListingById(req, res) {
     res.status(500).send('Error fetching listing');
   }
 }
+
 
 module.exports = {
   getMarkets,
