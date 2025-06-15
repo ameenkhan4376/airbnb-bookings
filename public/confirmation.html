@@ -1,46 +1,88 @@
 <!DOCTYPE html>
+<!--
+  Declare HTML5 document type for standards compliance.
+-->
 <html lang="en">
 <head>
+  <!-- Set character encoding -->
   <meta charset="UTF-8" />
+  <!-- Ensure proper rendering and touch zooming on mobile devices -->
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Page title shown in browser tab -->
   <title>Booking Confirmed</title>
+  <!--
+    Include Bootstrap CSS for styling and layout utilities.
+    Using a CDN link to version 5.3.1.
+  -->
   <link
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css"
     rel="stylesheet"
   />
 </head>
 <body class="p-4">
+  <!--
+    Top-level container with padding.
+    Centers content on larger screens and provides gutter on small screens.
+  -->
   <div class="container">
+    <!-- Main heading for the confirmation page -->
     <h1 class="mb-4">Booking Confirmed!</h1>
+
+    <!--
+      Card-like box to display booking details.
+      Initially shows a loading message until data is fetched.
+    -->
     <div id="details" class="card p-4">
       <p>Loading your confirmation...</p>
     </div>
+
+    <!--
+      Link back to the search/home page.
+      Styled as a Bootstrap link-button with top margin.
+    -->
     <a href="index.html" class="btn btn-link mt-3">&larr; Back to Search</a>
   </div>
 
   <script>
     (async () => {
-      // 1) Get booking ID from query string
+      // --------------------------------------------------
+      // 1) Extract 'booking_id' from the URL query string
+      // --------------------------------------------------
       const params = new URLSearchParams(window.location.search);
       const bookingId = params.get('booking_id');
+
+      // If no booking_id was provided, show a warning and stop
       if (!bookingId) {
-        document.getElementById('details').innerHTML = '<div class="alert alert-warning">No booking ID provided.</div>';
+        document.getElementById('details').innerHTML =
+          '<div class="alert alert-warning">No booking ID provided.</div>';
         return;
       }
 
       try {
-        // 2) Fetch booking details
+        // --------------------------------------------------
+        // 2) Fetch booking details from the backend API
+        // --------------------------------------------------
         const resBk = await fetch('/api/bookings/' + bookingId);
         if (!resBk.ok) throw new Error('Booking not found');
         const bk = await resBk.json();
 
-        // 3) Fetch listing name
+        // --------------------------------------------------
+        // 3) Fetch the associated listing's name
+        // --------------------------------------------------
+        // We only need the name here, so a single-field endpoint is fine
         const resList = await fetch('/api/listing/' + bk.listing_id);
-        const list = resList.ok ? await resList.json() : { name: 'Listing ' + bk.listing_id };
+        // If the listing fetch fails, fall back to a default title
+        const list = resList.ok
+          ? await resList.json()
+          : { name: 'Listing ' + bk.listing_id };
 
-        // 4) Render confirmation
+        // --------------------------------------------------
+        // 4) Render the confirmation details into the card
+        // --------------------------------------------------
         document.getElementById('details').innerHTML = `
+          <!-- Listing title -->
           <h2 class="h5">${list.name}</h2>
+          <!-- Unstyled list of booking fields -->
           <ul class="list-unstyled mt-3">
             <li><strong>Guest:</strong> ${bk.guest_name}</li>
             <li><strong>From:</strong> ${new Date(bk.start_date).toDateString()}</li>
@@ -49,8 +91,13 @@
           </ul>
         `;
       } catch (err) {
+        // Log the error for debugging in the console
         console.error(err);
-        document.getElementById('details').innerHTML = `<div class="alert alert-danger">Error loading confirmation: ${err.message}</div>`;
+        // Show a Bootstrap-styled error alert to the user
+        document.getElementById('details').innerHTML =
+          `<div class="alert alert-danger">
+             Error loading confirmation: ${err.message}
+           </div>`;
       }
     })();
   </script>

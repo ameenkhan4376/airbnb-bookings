@@ -1,46 +1,121 @@
 <!DOCTYPE html>
+<!--
+  Declare the document type as HTML5 for modern browser rendering.
+-->
 <html lang="en">
 <head>
+  <!--
+    Specify the character encoding for the document.
+  -->
   <meta charset="UTF-8">
+  <!--
+    Ensure proper scaling and touch zooming on mobile devices.
+    width=device-width matches the screen’s width, initial-scale=1 sets the zoom level.
+  -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!--
+    The title shown in the browser tab.
+  -->
   <title>AirBnB Listings</title>
+  <!--
+    Include Bootstrap’s CSS from a CDN for responsive grid, form styling,
+    buttons, and utility classes.
+  -->
   <link
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css"
     rel="stylesheet"
   />
 </head>
 <body class="p-4">
+  <!--
+    Apply padding around the entire body using Bootstrap’s spacing utility.
+  -->
   <div class="container">
+    <!--
+      Center the content and constrain its maximum width.
+    -->
     <h1 class="mb-4">Search Listings</h1>
+    <!--
+      Main heading for the page with a bottom margin.
+    -->
 
     <form id="filterForm" class="row g-2 mb-4">
+      <!--
+        The search form is laid out as a Bootstrap row with gutters (g-2)
+        and a bottom margin (mb-4).
+      -->
       <div class="col-md-4">
+        <!--
+          On medium+ screens this takes 4/12 of the row width; on smaller screens,
+          it spans the full width.
+        -->
         <label for="marketSelect" class="form-label">Market</label>
+        <!--
+          Accessible label linked to the select via the for/id attributes.
+        -->
         <select class="form-select" id="marketSelect" name="market">
+          <!--
+            Default option representing “no filter” when blank.
+          -->
           <option value="">Any market</option>
         </select>
+        <!--
+          Dropdown populated dynamically with available markets.
+        -->
       </div>
+
       <div class="col-md-4">
         <label for="typeSelect" class="form-label">Property Type</label>
         <select class="form-select" id="typeSelect" name="property_type">
           <option value="">Any type</option>
         </select>
+        <!--
+          Dropdown for filtering by property type (House, Apartment, etc.).
+        -->
       </div>
+
       <div class="col-md-2">
         <label for="bedrooms" class="form-label">Bedrooms</label>
+        <!--
+          Number input to filter by minimum number of bedrooms.
+        -->
         <input
-          type="number" min="1" class="form-control"
-          id="bedrooms" name="bedrooms" placeholder="Any"
+          type="number"
+          min="1"
+          class="form-control"
+          id="bedrooms"
+          name="bedrooms"
+          placeholder="Any"
         />
       </div>
+
       <div class="col-md-2 d-flex align-items-end">
-        <button type="submit" class="btn btn-primary w-100">Search</button>
+        <!--
+          Align the button flush to the bottom of the form row.
+        -->
+        <button type="submit" class="btn btn-primary w-100">
+          Search
+        </button>
+        <!--
+          Full-width primary button to trigger the form submission.
+        -->
       </div>
     </form>
 
     <ul id="results" class="list-group"></ul>
+    <!--
+      Unordered list where search results (listings) will be injected
+      dynamically as list-group items.
+    -->
   </div>
 
+  <!--
+    Include the main JavaScript file that handles:
+      1. Fetching markets, property types, and listings via the API
+      2. Populating the dropdowns
+      3. Handling form submission to refresh results
+      4. Rendering the returned listings into the #results element
+  -->
   <script src="main.js"></script>
 
 </body>

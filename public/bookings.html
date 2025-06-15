@@ -1,78 +1,146 @@
 <!DOCTYPE html>
-
+<!--
+  Declare the document type as HTML5.
+-->
 <html lang="en">
 <head>
+  <!--
+    Specify character encoding and responsive viewport settings.
+  -->
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Book Listing</title>
+  <!--
+    Include Bootstrap CSS from CDN for styling and layout utilities.
+  -->
   <link
     href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css"
     rel="stylesheet"
   />
 </head>
 <body class="p-4">
+  <!--
+    Main container to center content and apply padding.
+  -->
   <div class="container">
+    <!--
+      Page heading with bottom margin.
+    -->
     <h1 class="mb-4">Book Your Stay</h1>
 
+    <!-- Listing info -->
+    <div id="listingInfo" class="mb-4">
+      <!--
+        Placeholder text shown while listing details are loading.
+      -->
+      <p>Loading listing details...</p>
+    </div>
 
-<!-- Listing info -->
-<div id="listingInfo" class="mb-4">
-  <p>Loading listing details...</p>
-</div>
+    <!-- Booking form -->
+    <form id="bookingForm" class="row g-2">
+      <!--
+        Hidden input to store the listing ID passed via URL query string.
+      -->
+      <input type="hidden" name="listing_id" id="listingId" />
 
-<!-- Booking form -->
-<form id="bookingForm" class="row g-2">
-  <input type="hidden" name="listing_id" id="listingId" />
+      <!-- Guest name field -->
+      <div class="col-12">
+        <label for="guest_name" class="form-label">Your Name</label>
+        <input
+          type="text"
+          class="form-control"
+          id="guest_name"
+          name="guest_name"
+          required
+        />
+      </div>
 
-  <div class="col-12">
-    <label for="guest_name" class="form-label">Your Name</label>
-    <input type="text" class="form-control" id="guest_name" name="guest_name" required />
-  </div>
+      <!-- Arrival date field -->
+      <div class="col-md-6">
+        <label for="arrival" class="form-label">Arrival Date</label>
+        <input
+          type="date"
+          class="form-control"
+          id="arrival"
+          name="arrival"
+          required
+        />
+      </div>
 
-  <div class="col-md-6">
-    <label for="arrival" class="form-label">Arrival Date</label>
-    <input type="date" class="form-control" id="arrival" name="arrival" required />
-  </div>
+      <!-- Departure date field -->
+      <div class="col-md-6">
+        <label for="departure" class="form-label">Departure Date</label>
+        <input
+          type="date"
+          class="form-control"
+          id="departure"
+          name="departure"
+          required
+        />
+      </div>
 
-  <div class="col-md-6">
-    <label for="departure" class="form-label">Departure Date</label>
-    <input type="date" class="form-control" id="departure" name="departure" required />
-  </div>
+      <!-- Contact email field -->
+      <div class="col-12">
+        <label for="contact" class="form-label">Contact Email</label>
+        <input
+          type="email"
+          class="form-control"
+          id="contact"
+          name="contact"
+          required
+        />
+      </div>
 
-  <div class="col-12">
-    <label for="contact" class="form-label">Contact Email</label>
-    <input type="email" class="form-control" id="contact" name="contact" required />
-  </div>
-
-  <div class="col-12">
-    <button type="submit" class="btn btn-success">Confirm Booking</button>
-  </div>
-</form>
-
-
+      <!-- Submit button -->
+      <div class="col-12">
+        <button type="submit" class="btn btn-success">Confirm Booking</button>
+      </div>
+    </form>
   </div>
 
   <script>
-    // Extract listing_id from URL
+    // ---------------------------------------------------
+    // 1) Extract the `listing_id` parameter from the URL.
+    //    This value is used to fetch and submit booking data.
+    // ---------------------------------------------------
     const params = new URLSearchParams(window.location.search);
     const listingId = params.get('listing_id');
+    // Store the listing ID into the hidden form input
     document.getElementById('listingId').value = listingId;
 
-    // Load listing details including description
+    // ---------------------------------------------------
+    // 2) Function to fetch and display the listing details
+    // ---------------------------------------------------
     async function loadListing() {
       const infoEl = document.getElementById('listingInfo');
+
+      // If no listing_id is provided, show a warning and hide the form
       if (!listingId) {
-        infoEl.innerHTML = '<div class="alert alert-warning">No listing selected. <a href="index.html">Go back</a>.</div>';
+        infoEl.innerHTML = `
+          <div class="alert alert-warning">
+            No listing selected. <a href="index.html">Go back</a>.
+          </div>
+        `;
         document.getElementById('bookingForm').style.display = 'none';
         return;
       }
+
+      // Fetch the listing data from the server
       const res = await fetch('/api/listing/' + listingId);
+
+      // Handle case where the listing does not exist
       if (!res.ok) {
-        infoEl.innerHTML = '<div class="alert alert-danger">Listing not found.</div>';
+        infoEl.innerHTML = `
+          <div class="alert alert-danger">Listing not found.</div>
+        `;
         document.getElementById('bookingForm').style.display = 'none';
         return;
       }
+
+      // Parse the JSON response
       const { name, price, description } = await res.json();
+
+      // Render the listing title, price, and description
       infoEl.innerHTML = `
         <h2 class="h4">${name}</h2>
         <p><strong>Price per night:</strong> $${price}</p>
@@ -80,25 +148,38 @@
       `;
     }
 
-    // Handle booking form submission
+    // ---------------------------------------------------
+    // 3) Booking form submission handler
+    // ---------------------------------------------------
     document.getElementById('bookingForm').addEventListener('submit', async e => {
+      // Prevent the default page reload
       e.preventDefault();
+
+      // Collect form data as URL-encoded parameters
       const form = e.target;
       const data = new URLSearchParams(new FormData(form));
+
+      // Send a POST request to create a new booking
       const post = await fetch('/api/bookings', {
         method: 'POST',
         body: data
       });
+
+      // If the booking fails, show an alert with the error message
       if (!post.ok) {
         const err = await post.text();
         return alert('Booking failed: ' + err);
       }
+
+      // On success, the server redirects to the confirmation page.
+      // Use the returned URL to navigate there.
       window.location = post.url;
     });
 
-    // Initialize page
+    // ---------------------------------------------------
+    // 4) Initialize the page by loading the listing details
+    // ---------------------------------------------------
     loadListing();
   </script>
-
 </body>
 </html>
